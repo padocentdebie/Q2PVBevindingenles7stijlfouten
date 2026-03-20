@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strafvorderlijke Taalzuivering - Decoroefening</title>
+    <style>
+        :root { --blauw: #003082; --geel: #ffcc00; --grijs: #f4f4f4; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--grijs); margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1, h2 { color: var(--blauw); text-align: center; }
+        .leaderboard-container { background: #eee; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .klas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9em; }
+        .klas-item { border-bottom: 1px solid #ddd; padding: 5px 0; display: flex; justify-content: space-between; }
+        .zin-display { background: var(--blauw); color: white; padding: 20px; border-radius: 8px; font-style: italic; margin: 20px 0; text-align: center; min-height: 50px; font-size: 1.1em; }
+        input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1em; }
+        button { width: 100%; padding: 15px; background: var(--blauw); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1em; transition: 0.3s; }
+        button:hover { background: #001a4d; }
+        .feedback-list { margin-top: 30px; border-top: 2px solid var(--geel); padding-top: 20px; }
+        .antwoord-kaart { background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 8px; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .score-btn { position: absolute; right: 15px; top: 15px; cursor: pointer; background: var(--geel); border: none; border-radius: 50%; width: 35px; height: 35px; font-weight: bold; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🚔 Strafvorderlijke Taalzuivering</h1>
+
+    <div id="login-scherm">
+        <div class="leaderboard-container">
+            <h3>Leaderboard per Klas</h3>
+            <div class="klas-grid" id="leaderboard-content">
+                </div>
+        </div>
+        
+        <label for="select-klas">Selecteer uw klas:</label>
+        <select id="select-klas">
+            <option value="">Maak een keuze...</option>
+            <option value="Alpha">Alpha</option>
+            <option value="Bravo">Bravo</option>
+            <option value="Charlie">Charlie</option>
+            <option value="Delta">Delta</option>
+            <option value="Echo">Echo</option>
+            <option value="Foxtrot">Foxtrot</option>
+            <option value="Golf">Golf</option>
+            <option value="Hotel">Hotel</option>
+            <option value="India">India</option>
+            <option value="Juliett">Juliett</option>
+            <option value="Kilo">Kilo</option>
+            <option value="Lima">Lima</option>
+            <option value="Mike">Mike</option>
+        </select>
+        
+        <input type="text" id="student-naam" placeholder="Uw achternaam en voorletters...">
+        <button onclick="startOefening()">Inloggen op Leerplein</button>
+    </div>
+
+    <div id="oefen-scherm" style="display:none;">
+        <h2>Actuele Casus</h2>
+        <div id="actieve-zin" class="zin-display">Wachten op instructie van de docent...</div>
+        
+        <label for="input-verbetering">Uw correctie (denk aan pleonasmen/tautologie):</label>
+        <input type="text" id="input-verbetering" autocomplete="off">
+        <button onclick="verstuurAntwoord()">Indienen & Feedback bekijken</button>
+
+        <div class="feedback-list">
+            <h3>Peer Feedback (Andere studenten)</h3>
+            <div id="antwoorden-feed"></div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, onValue, set, push, update, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyB12mTMBnuxdC4W4htyFO_C7Dnh3maVKew",
+        authDomain: "decoroefening.firebaseapp.com",
+        databaseURL: "https://decoroefening-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "decoroefening",
+        storageBucket: "decoroefening.firebasestorage.app",
+        messagingSenderId: "945998495824",
+        appId: "1:945998495824:web:a76dc7519b3b262a021155"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    let studentNaam = "";
+    let studentKlas = "";
+    let huidigeZinId = 0;
+    const klassen = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliett", "Kilo", "Lima", "Mike"];
+
+    // Update leaderboard bij start en bij elke verandering
+    onValue(ref(db, 'leaderboard'), (snapshot) => {
+        const data = snapshot.val() || {};
+        const container = document.getElementById('leaderboard-content');
+        container.innerHTML = "";
+        klassen.forEach(klas => {
+            const score = (data[klas] && data[klas].totaal) ? data[klas].totaal : 0;
+            container.innerHTML += `<div class="klas-item"><span>${klas}</span> <span><b>${score}</b> pnt</span></div>`;
+        });
+    });
+
+    window.startOefening = () => {
+        studentNaam = document.getElementById('student-naam').value;
+        studentKlas = document.getElementById('select-klas').value;
+        
+        if(studentNaam && studentKlas) {
+            document.getElementById('login-scherm').style.display = 'none';
+            document.getElementById('oefen-scherm').style.display = 'block';
+            luisterNaarUpdates();
+        } else {
+            alert("Selecteer eerst uw klas en voer uw naam in.");
+        }
+    };
+
+    function luisterNaarUpdates() {
+        onValue(ref(db, 'sessie/huidigeZin'), (snapshot) => {
+            const data = snapshot.val();
+            if(data) {
+                document.getElementById('actieve-zin').innerText = data.tekst;
+                huidigeZinId = data.id;
+                document.getElementById('input-verbetering').value = "";
+            }
+        });
+
+        onValue(ref(db, 'antwoorden/' + huidigeZinId), (snapshot) => {
+            const feed = document.getElementById('antwoorden-feed');
+            feed.innerHTML = "";
+            snapshot.forEach((child) => {
+                const item = child.val();
+                feed.innerHTML += `
+                    <div class="antwoord-kaart">
+                        <strong>Collega (${item.klas}):</strong><br>${item.tekst}
+                        <button class="score-btn" title="Geef punt" onclick="geefPunt('${child.key}', '${item.klas}')">+</button>
+                    </div>`;
+            });
+        });
+    }
+
+    window.verstuurAntwoord = () => {
+        const tekst = document.getElementById('input-verbetering').value;
+        if(!tekst) return;
+        push(ref(db, 'antwoorden/' + huidigeZinId), {
+            naam: studentNaam,
+            klas: studentKlas,
+            tekst: tekst
+        });
+        document.getElementById('input-verbetering').value = "Ingezonden...";
+    };
+
+    window.geefPunt = (antwoordKey, klas) => {
+        update(ref(db, `leaderboard/${klas}`), { totaal: increment(1) });
+    };
+</script>
+</body>
+</html>
